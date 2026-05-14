@@ -1,0 +1,10 @@
+[
+  {
+    "targets": ["localhost:{{ current_exporter.port }}"],
+    "labels": {
+      "job": "{{ item | basename | replace('.yml', '') }}",
+      "service_type": "custom_python",
+      "deployed_by": "ansible_workflow_3"
+    }
+  }
+]

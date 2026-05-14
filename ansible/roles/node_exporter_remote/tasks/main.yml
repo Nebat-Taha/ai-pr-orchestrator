@@ -1,0 +1,73 @@
+#================================================================================================
+# Architecture: Distributed Metric Collection
+# Trigger: Executed on all nodes except the monitoring hub (e.g., your application or database nodes).
+# Decisions: * Self-Contained: Unlike the Hub version, this role includes its own user/group creation (Phase 1). This is vital because these remote nodes don't necessarily run the common role in the same way the Hub does.
+#
+# No Local Registration: It does not create a .json file. It relies entirely on its AWS Tags (Monitoring-Stack: prometheus) to be "discovered" by the Hub's ec2_sd_configs.
+#================================================================================================
+---
+# ==============================================================================
+# PHASE 1: Install & Setup (The "Plumbing")
+# DECISION: We create the prometheus user here to ensure the role is portable
+#           and can run on any standalone AWS instance.
+# ==============================================================================
+# PHASE 1: Install & Setup
+- name: Create prometheus group
+  group:
+    name: prometheus
+    state: present
+    system: yes
+
+- name: Create prometheus user
+  user:
+    name: prometheus
+    group: prometheus
+    shell: /sbin/nologin
+    system: yes
+    create_home: no
+
+- name: Download and Unarchive Node Exporter
+  unarchive:
+    src: "https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node\
+      _exporter-1.7.0.linux-amd64.tar.gz"
+    dest: /tmp
+    remote_src: yes
+    creates: "/tmp/node_exporter-1.7.0.linux-amd64/node_exporter"
+  register: node_exporter_download
+  until: node_exporter_download is succeeded
+  retries: 5
+  delay: 10
+
+- name: Copy binary to /usr/local/bin
+  copy:
+    src: "/tmp/node_exporter-1.7.0.linux-amd64/node_exporter"
+    dest: /usr/local/bin/node_exporter
+    mode: "0755"
+    owner: prometheus
+    group: prometheus
+    remote_src: yes
+
+# ==============================================================================
+# PHASE 2: Configuration & Service (The "Heartbeat")
+# DECISION: We use 'register' and 'when' logic here as a local alternative
+#           to 'notify/handlers' for immediate feedback.
+# ==============================================================================
+# PHASE 2: Configuration & Service
+- name: Install systemd service file
+  template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+  register: service_file
+
+- name: Force systemd reload and start service
+  systemd:
+    name: node_exporter
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Restart node_exporter if service file changed
+  systemd:
+    name: node_exporter
+    state: restarted
+  when: service_file.changed

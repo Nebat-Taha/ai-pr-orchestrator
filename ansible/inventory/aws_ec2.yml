@@ -1,0 +1,43 @@
+# ==============================================================================
+# ANSIBLE DYNAMIC INVENTORY: AWS EC2
+# STRATEGY: Tag-based Dynamic Grouping
+# ==============================================================================
+
+
+---
+plugin: amazon.aws.aws_ec2
+regions:
+  - us-east-1
+
+# 1. SEARCH FILTERS (Targeting specific Monitoring infrastructure)
+#     Broaden the filter to find BOTH types of servers
+filters:
+  instance-state-name: [ 'running' ]
+  tag:Monitoring_Stack: prometheus
+  # This finds anything with either the 'Role' tag OR the 'Monitoring-Stack' tag
+  #tag:Role: monitoring-server
+  #tag:Monitoring-Stack: prometheus
+
+# 2. GROUPING LOGIC
+
+keyed_groups:
+  # Group A: role_monitoring_server (The engine)
+  # Creates group: role_monitoring_server
+  - key: tags.Role
+    prefix: role
+    separator: "_"
+
+  # Group B: monitoring_stack_prometheus (The nodes to be monitored)
+  # Creates group: monitoring_stack_prometheus
+  - key: tags.Monitoring_Stack
+    prefix: monitoring_stack
+    separator: "_"
+
+# 3. CONNECTION MAPPING
+hostnames:
+  - tag:Name
+  - public-ip-address # Use Public IP for identification
+
+compose:
+  # Use Public IP for the SSH connection from GitHub
+  ansible_host: public_ip_address

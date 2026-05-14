@@ -1,0 +1,13 @@
+[
+  {% for bucket in filtered_buckets %}
+  {
+    "targets": ["localhost:9201"],
+    "labels": {
+      "job": "s3_monitor",
+      "resource_type": "s3",
+      "resource_name": "{{ bucket.name }}",
+      "project_tag": "{{ bucket.tags.project | default('monitoring-system') }}"
+    }
+  }{{ "," if not loop.last else "" }}
+  {% endfor %}
+]

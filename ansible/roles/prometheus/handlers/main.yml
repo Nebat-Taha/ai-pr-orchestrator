@@ -1,0 +1,11 @@
+---
+# ==============================================================================
+# HANDLER: Prometheus Service Management
+# DECISION: We use 'restarted' to ensure the new binary and config are loaded.
+#          daemon_reload is true in case the .service file changed.
+# ==============================================================================
+- name: Restart Prometheus
+  systemd:
+    name: prometheus
+    state: restarted
+    daemon_reload: yes

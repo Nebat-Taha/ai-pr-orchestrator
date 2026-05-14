@@ -1,0 +1,14 @@
+#================================================================================================
+# Purpose: Deploys the "sensor" to your remote AWS nodes.
+# Logic: This uses the dynamic group tag_Monitoring-Stack_prometheus. Because this group is created
+# automatically by your aws_ec2.yml inventory, any new EC2 instance you tag in Terraform will
+# automatically be targeted by this playbook.
+#================================================================================================
+
+---
+- name: "Install Node Exporter on Remote Managed Nodes"
+  # Target instances tagged with 'Monitoring: enabled'
+  hosts: "monitoring_stack_prometheus:!role_monitoring_server"
+  become: true
+  roles:
+    - node_exporter_remote

@@ -1,0 +1,10 @@
+---
+# Option A: Restart ALL exporters whenever any script changes
+- name: restart all exporters
+  systemd:
+    name: "{{ item }}_monitor.service"
+    state: restarted
+    daemon_reload: yes
+  loop:
+    - s3
+    - ec2 # You can eventually make this a variable/list

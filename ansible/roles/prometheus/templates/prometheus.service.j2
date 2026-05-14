@@ -1,0 +1,40 @@
+# Architecture: Systemd Service Definition
+# Decisions:
+
+# User Isolation: Runs as the prometheus user we created in the common role.
+
+# Data Persistence: Points to /var/lib/prometheus for the database.
+
+# Retention: Set to 15 days by default, balancing disk space and history.
+
+# Auto-Restart: Configured to restart after 5 seconds if the process fails.
+
+
+[Unit]
+Description=Prometheus Monitoring System
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=prometheus
+Group=prometheus
+Type=simple
+ExecStart=/usr/local/bin/prometheus \
+    --config.file=/etc/prometheus/prometheus.yml \
+    --storage.tsdb.path=/var/lib/prometheus/ \
+    --web.console.templates=/etc/prometheus/consoles \
+    --web.console.libraries=/etc/prometheus/console_libraries \
+    --web.listen-address=0.0.0.0:9090 \
+    --storage.tsdb.retention.time=15d \
+    --web.enable-lifecycle  
+
+# allows you to reload the Prometheus configuration without restarting the entire service.
+
+# DECISION: We enable '--web.enable-lifecycle' so you can reload 
+#           config changes with a curl command if you ever need to.
+
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

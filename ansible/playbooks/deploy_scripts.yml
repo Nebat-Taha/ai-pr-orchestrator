@@ -1,0 +1,11 @@
+#================================================================================================
+# Purpose: The high-frequency deployment of custom Python logic.
+# Logic: This is what Workflow 4 calls. It only touches the Hub (role_monitoring_server) to update
+# the Python scripts and their corresponding systemd services.
+#================================================================================================
+---
+- name: "Workflow 3: Deploy Custom Exporters"
+  hosts: role_monitoring_server
+  become: true
+  roles:
+    - custom_exporters

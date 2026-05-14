@@ -1,0 +1,48 @@
+---
+- name: Discover Tagged S3 Buckets (The Registrar)
+  delegate_to: localhost
+  become: false
+  shell: |
+    # Force the search across all buckets
+    for bucket in $(aws s3api list-buckets --query 'Buckets[].Name' --output text); do
+      # Fetch tags and use grep to be less sensitive to exact string formatting
+      TAGS=$(aws s3api get-bucket-tagging --bucket "$bucket" --output json 2>/dev/null)
+      
+      # Check if 'monitoring-system' exists in the tags (case-insensitive)
+      if echo "$TAGS" | grep -iq "monitoring-system"; then
+        echo "$bucket"
+      fi
+    done
+  register: bucket_discovery
+  failed_when: false
+
+- name: Update Monitored Buckets Registry
+  copy:
+    # Use 'trim' to ensure no weird whitespace enters the file
+    content: "{{ bucket_discovery.stdout | trim }}"
+    dest: "/etc/prometheus/monitored_buckets.list"
+    owner: prometheus
+    group: prometheus
+    mode: "0644"
+
+- name: Register Exporter Target in Self-Service Layer
+  copy:
+    content: |
+      [
+        {
+          "targets": ["localhost:9201"],
+          "labels": {
+            "exporter_type": "s3_manager",
+            "project": "monitoring-system"
+          }
+        }
+      ]
+    dest: "/etc/prometheus/file_sd/aws_resources.json"
+    owner: prometheus
+    group: prometheus
+    mode: "0644"
+
+- name: Reload Prometheus
+  systemd:
+    name: prometheus
+    state: restarted

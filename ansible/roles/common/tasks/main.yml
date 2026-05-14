@@ -1,0 +1,102 @@
+# ===============================================================================================
+# Architecture: Base Environment Setup
+# Trigger: Executed as the first role in site.yml for all hosts.
+# Decisions: * Uses a System User (prometheus) without a home directory or shell access to
+# minimize the attack surface.
+
+# Standardizes the /opt/monitoring path to avoid "Configuration Drift" where files are scattered
+# across /home/ubuntu or /tmp.
+
+# Prepares File Service Discovery (file_sd) paths so Prometheus can dynamically find targets
+# without a reload.
+#================================================================================================
+
+---
+# ==============================================================================
+# TASK: Repository & Package Management
+# DECISION:We set cache_valid_time to 86400 (24 hours). This ensures the
+#           system index is relatively fresh without wasting time on
+#           every single playbook run.
+# TODO: follow up
+# ==============================================================================
+- name: Update apt cache (Once)
+  apt:
+    update_cache: yes
+    cache_valid_time: 86400 # Only runs 'apt update' once per day
+
+- name: Ensure prometheus group exists
+  group:
+    name: prometheus
+    state: present
+    system: yes
+
+- name: Create prometheus system user
+  user:
+    name: prometheus
+    group: prometheus
+    shell: /sbin/nologin # this user cannot be used to login to the server
+    system: yes
+    create_home: no
+
+# ==============================================================================
+# TASK: Directory Structure Orchestration
+# DECISION: Use a loop to keep the code DRY (Don't Repeat Yourself).
+# ==============================================================================
+
+- name: Ensure universe repository is enabled
+  apt_repository:
+    repo: "deb http://archive.ubuntu.com/ubuntu {{ ansible_distribution_release }} universe"
+    state: present
+
+- name: Wait for any background apt locks to release
+  shell: |
+    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done;
+  changed_when: false
+
+- name: Force refresh of all apt repositories
+  shell: |
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+    apt-get update
+  become: true
+  changed_when: true
+
+- name: DIAGNOSTIC - Check if instance can reach Google DNS
+  command: ping -c 3 8.8.8.8
+  register: ping_test
+  ignore_errors: true
+
+- name: DIAGNOSTIC - Show Ping Results
+  debug:
+    msg: "Internet Connection Status: {{ 'SUCCESS' if ping_test.rc == 0 else 'FAILED' }}"
+
+- name: Create base monitoring directories
+  file:
+    path: "{{ item }}" # This variable pulls the current string from the 'loop' list below
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: "0755"
+  loop:
+    - /opt/monitoring
+    - /opt/monitoring/scripts
+    - /opt/monitoring/venv
+    - /etc/prometheus
+    - /etc/prometheus/file_sd
+    - /var/lib/prometheus
+
+- name: Force System Update and Install Dependencies
+  shell: |
+    set -e
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+    apt-get update -y
+    apt-get install -y python3-full python3-venv python3-dev curl git
+  become: true
+  register: apt_force_result
+  changed_when: "'installs' in apt_force_result.stdout or 'upgraded' in apt_force_result.stdout"
+
+- name: Show Update Output if it fails
+  debug:
+    var: apt_force_result.stdout_lines
+  when: apt_force_result.rc != 0

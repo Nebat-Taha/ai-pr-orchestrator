@@ -1,0 +1,14 @@
+#================================================================================================
+# Purpose: Sets up the Monitoring Hub.
+# Logic: This targets the role_monitoring_server group (defined by your dynamic inventory). It runs the
+# common environment, the prometheus engine, and the local node_exporter so the server can monitor itself.
+#================================================================================================
+---
+- name: "Workflow 2: Infrastructure Provisioning"
+  hosts: role_monitoring_server
+  become: true
+  roles:
+    - common
+    - prometheus
+    - node_exporter
+    - custom_exporters

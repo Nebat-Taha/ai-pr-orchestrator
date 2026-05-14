@@ -1,0 +1,28 @@
+---
+# 1. We load the specific settings (Port, Script Name, etc.) for this metric
+- name: "Load vars for {{ item | basename }}"
+  include_vars:
+    file: "{{ item }}"
+    name: "current_exporter"
+
+# 2. We build the "Engine" (Systemd) using your template
+- name: "Template Systemd Service"
+  template:
+    src: exporter.service.j2 # Ansible looks in ../templates/ automatically
+    dest: "/etc/systemd/system/{{ item | basename | replace('.yml', '') }}.service"
+  register: service_update
+
+# 3. THE MAGIC: We tell Prometheus this specific exporter exists
+- name: "Template Prometheus Target"
+  template:
+    src: target.json.j2
+    dest: "/etc/prometheus/file_sd/{{ item | basename | replace('.yml', '') }}.json"
+
+# 4. We apply changes immediately
+- name: "Restart service if changed"
+  systemd:
+    name: "{{ item | basename | replace('.yml', '') }}"
+    state: restarted
+    enabled: yes
+    daemon_reload: yes
+  when: service_update.changed

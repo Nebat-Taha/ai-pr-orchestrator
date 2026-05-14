@@ -1,0 +1,51 @@
+# Architecture: Multi-Layer Service Discovery
+# Decisions:
+
+# Layer 1 (EC2 SD): Uses ec2_sd_configs to automatically "sniff" out any instance with your tag. 
+# This is huge because as you scale your infrastructure in Terraform, Prometheus updates its 
+# target list without a restart.
+
+# Layer 2 (CloudWatch): Routes through localhost:9106 (where your CloudWatch exporter will live) 
+# to pull AWS-managed metrics like RDS or SQS.
+
+# Layer 3 (File SD): This is your "Automation Hook." By watching /etc/prometheus/file_sd/*.json,
+# you allow your GitHub Actions or other scripts to "register" new custom exporters simply by 
+# dropping a small JSON file.
+# ==============================================================================
+# PROMETHEUS GLOBAL CONFIGURATION
+# ==============================================================================
+# PROMETHEUS GLOBAL CONFIGURATION
+global:
+  scrape_interval: 15s     # Frequency of data collection
+  evaluation_interval: 15s # Frequency of alert rule evaluation
+  external_labels:
+    monitor: 'master-monitor'
+    origin: 'us-east-1'
+
+scrape_configs:
+  # 1. SELF-MONITORING
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # 2. THE INFRASTRUCTURE LAYER (EC2 Auto-Discovery)
+  - job_name: 'aws_ec2_infrastructure'
+    ec2_sd_configs:
+      - region: us-east-1
+        port: 9100
+        filters:
+          - name: tag:Monitoring_Stack
+            values: ["prometheus"]
+    
+    # RELABELING: Transforms raw AWS metadata into readable Grafana labels
+    relabel_configs:
+      - source_labels: [__meta_ec2_tag_Name]
+        target_label: instance
+      - source_labels: [__meta_ec2_availability_zone]
+        target_label: az
+
+   # 3. THE SELF-SERVICE LAYER (Dynamic Custom Exporters)
+  - job_name: 'custom_python_exporters'
+    file_sd_configs:
+      - files:
+          - '/etc/prometheus/file_sd/*.json'

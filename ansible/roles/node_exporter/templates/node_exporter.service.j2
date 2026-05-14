@@ -1,0 +1,28 @@
+# =============================================================================
+# Architecture: Systemd Service Definition
+# Decisions:
+# 
+# Collector Optimization: We use the default settings, which collect standard Linux metrics (CPU, Load, RAM, Disk, Network).
+# 
+# Port Standardization: Hardcoded to 9100, which matches the port Prometheus is looking for in its ec2_sd_configs.
+
+# Security: Runs under the prometheus user with no shell access.
+
+# ======================================================================
+[Unit]
+Description=Node Exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=prometheus
+Group=prometheus
+Type=simple
+ExecStart=/usr/local/bin/node_exporter \
+    --web.listen-address=:9100
+
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

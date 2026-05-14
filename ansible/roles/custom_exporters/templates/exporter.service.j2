@@ -1,0 +1,15 @@
+[Unit]
+Description=Custom Prometheus Exporter for {{ item | basename | replace('.yml', '') }}
+After=network.target
+
+[Service]
+User=prometheus
+Group=prometheus
+WorkingDirectory=/opt/monitoring/scripts
+# EXECUTION: Calls the venv python, the mapped .py file, and the dynamic port
+ExecStart=/opt/monitoring/venv/bin/python /opt/monitoring/scripts/{{ item | basename | replace('.yml', '.py') }} --port {{ current_exporter.port }}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

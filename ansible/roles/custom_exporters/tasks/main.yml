@@ -1,0 +1,57 @@
+#================================================================================================
+# Architecture: Automated Python Exporter Factory
+# Decisions:
+#
+# Path Enforcement: Uses /opt/monitoring/venv/bin/python to ensure boto3 and prometheus_client are always available.
+#
+# Port Management: Passes {{ current_exporter.port }} as a CLI argument to the Python script, allowing one script template to run on multiple ports if needed.
+#
+# Metadata Tagging: The target.json.j2 includes a deployed_by: ansible_workflow_3 label, which is excellent for troubleshooting in Grafana later.
+# TODO: run by the third workflow deploy-exporters.yml and deploy_scripts.yml playbook
+# ================================================================================================
+---
+- name: Ensure monitoring directory exists
+  file:
+    path: /opt/monitoring/scripts
+    state: directory
+    owner: prometheus
+    mode: "0755"
+
+- name: Install virtualenv package
+  apt:
+    name: python3-venv
+    state: present
+
+- name: Create VirtualEnv and install dependencies
+  pip:
+    name:
+      - boto3
+      - prometheus_client
+    virtualenv: /opt/monitoring/venv
+    virtualenv_command: python3 -m venv
+
+- name: Copy Python scripts
+  copy:
+    src: "{{ item }}"
+    dest: /opt/monitoring/scripts/
+    owner: prometheus
+    mode: "0755"
+  with_fileglob:
+    - "../../python_scripts/*.py"
+  notify: restart all exporters
+
+- name: Ensure scripts have correct permissions
+  file:
+    path: /opt/monitoring/scripts/{{ item }}
+    owner: prometheus
+    group: prometheus
+    mode: "0755"
+  with_items:
+    - s3_monitor.py
+    - ec2_monitor.py
+    - sqs_age_monitor.py
+
+- name: Process each exporter config
+  include_tasks: manage_single_exporter.yml
+  with_fileglob:
+    - "../../exporters_configs/*.yml"

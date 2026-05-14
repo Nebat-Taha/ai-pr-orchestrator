@@ -1,0 +1,68 @@
+#================================================================================================
+# Architecture: Monitoring Core Installation
+# Trigger: Executed only on role_monitoring_server.
+# Decisions: * Binary Management: Installs to /usr/local/bin to keep it in the system $PATH, allowing you to run promtool check config from anywhere.
+
+# Service Orchestration: Uses systemd to ensure the process survives a server reboot and logs
+# directly to journalctl.
+
+# Dynamic Configuration: Uses Jinja2 templates (.j2) for the config and service files, allowing
+# us to inject variables like the Retention Policy or External Labels dynamically.
+#================================================================================================
+---
+# ==============================================================================
+# TASK: Binary Acquisition & Extraction
+# DECISION: Download to /tmp to keep the filesystem clean. unarchive handles
+#           extraction and cleanup in one step.
+# ==============================================================================
+
+- name: Download Prometheus binary
+  get_url:
+    url: "https://github.com/prometheus/prometheus/releases/download/v2.51.0/prometheus-2.51.0.linux-amd64.tar.gz"
+    dest: "/tmp/prometheus.tar.gz"
+    mode: "0644"
+
+- name: Extract Prometheus binary
+  unarchive:
+    src: "/tmp/prometheus.tar.gz"
+    dest: "/tmp"
+    remote_src: yes
+
+- name: Copy Prometheus binaries to /usr/local/bin
+  copy:
+    src: "/tmp/prometheus-2.51.0.linux-amd64/{{ item }}"
+    dest: "/usr/local/bin/{{ item }}"
+    mode: "0755"
+    owner: prometheus
+    group: prometheus
+    remote_src: yes
+  loop:
+    - prometheus
+    - promtool
+# ==============================================================================
+# TASK: Configuration & Service Deployment
+# DECISION: We use 'notify' to trigger a Restart handler only if the
+#           file content actually changes.
+# ==============================================================================
+
+- name: Create Prometheus configuration from template
+  template:
+    src: prometheus.yml.j2
+    dest: /etc/prometheus/prometheus.yml
+    validate: "/usr/local/bin/promtool check config %s" # %s is the dest file
+    owner: prometheus
+    group: prometheus
+  notify: Restart Prometheus
+
+- name: Setup Systemd service for Prometheus
+  template:
+    src: prometheus.service.j2
+    dest: /etc/systemd/system/prometheus.service
+  notify: Restart Prometheus
+
+- name: Ensure Prometheus is started and enabled
+  systemd:
+    name: prometheus
+    state: started
+    enabled: yes
+    daemon_reload: yes # Ensures systemd picks up the new .service file

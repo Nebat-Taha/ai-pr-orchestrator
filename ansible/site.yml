@@ -1,0 +1,12 @@
+---
+- name: "Connection Warm-up: Ensure all keys work immediately"
+  hosts: monitoring_stack_prometheus
+  gather_facts: true # This is the SSH handshake
+  tasks:
+    - name: "Ping all hosts to verify connection"
+      ping:
+
+- import_playbook: playbooks/install_exporters.yml
+- import_playbook: playbooks/provision_server.yml
+- import_playbook: playbooks/register_resources.yml
+- import_playbook: playbooks/deploy_scripts.yml

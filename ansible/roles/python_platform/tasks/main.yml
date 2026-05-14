@@ -1,0 +1,48 @@
+#================================================================================================
+# Trigger: Executed after common to build the execution environment.
+# Decisions: * Virtualization: Uses /opt/monitoring/venv to isolate monitoring dependencies from
+# the host OS.
+
+# Core Libraries: Installs prometheus_client (for custom metrics) and boto3 (to allow scripts to
+# talk to AWS CloudWatch/EC2 APIs).
+
+# Hand-off Point: Prepares /opt/monitoring/scripts so that subsequent roles or CI/CD steps can
+# simply "drop" Python scripts into a ready-to-run environment.
+
+---
+# ==============================================================================
+# TASK: Python Environment Initialization
+# DECISION: We use a Virtual Environment (venv) to prevent "Dependency Hell"
+#           and ensure a clean, predictable runtime for our exporters.
+# ==============================================================================
+# 1. Setup the Python Environment
+- name: Create Python Virtual Environment
+  ansible.builtin.command:
+    # This creates a standalone Python instance in our monitoring directory
+    cmd: python3 -m venv /opt/monitoring/venv
+    # 'creates' ensures this task is idempotent; it won't run if the folder exists
+    creates: /opt/monitoring/venv/bin/python
+
+- name: Install required Python libraries
+  ansible.builtin.pip:
+    name:
+      - prometheus_client # Essential for creating Prometheus metrics
+      - boto3 # Allows Python to interact with AWS services
+      - requests # Used for hitting API endpoints (e.g., status checks)
+    virtualenv: /opt/monitoring/venv
+    state: present
+
+# ==============================================================================
+# TASK: Permissions & Hand-off
+# DECISION: Ensure the prometheus system user owns the script execution space.
+# ==============================================================================
+# 2. Setup Permissions
+- name: Ensure scripts directory is writable by prometheus user
+  ansible.builtin.file:
+    path: /opt/monitoring/scripts
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: "0755"
+# NOTE: The "Service Engine" logic is finalized in the deployment workflow.
+# This role ensures the environment is "Warm" and ready for file injection.

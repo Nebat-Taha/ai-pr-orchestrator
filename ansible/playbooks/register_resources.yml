@@ -1,0 +1,8 @@
+---
+- name: "AWS Resource Discovery: Register S3"
+  hosts: monitoring-system-prometheus-engine
+  become: true
+  collections:
+    - amazon.aws
+  roles:
+    - aws_resource_registrar

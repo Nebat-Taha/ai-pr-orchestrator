@@ -1,0 +1,69 @@
+#================================================================================================
+# Architecture: Host Metrics Collection
+# Trigger: Executed on all nodes in the monitoring stack.
+
+# Decisions:
+
+# Binary Isolation: Installed to /usr/local/bin and owned by the prometheus system user for security.
+
+# File Service Discovery (File-SD): It creates node_exporter.json. This tells the local Prometheus
+# instance, "I am here, scrape me on port 9100."
+
+# Standardization: Uses v1.7.0, a stable version compatible with modern Linux kernels and Prometheus 2.51.
+#================================================================================================
+
+---
+# ==============================================================================
+# TASK: Binary Acquisition
+# DECISION: We download and extract to /tmp to ensure the actual
+#           /usr/local/bin stays clean of tarball clutter.
+# ==============================================================================
+- name: Download Node Exporter
+  get_url:
+    url: "https://github.com/prometheus/node_exporter/releases/download/v1.7.0/node_exporter-1.7.0.linux-amd64.tar.gz"
+    dest: "/tmp/node_exporter.tar.gz"
+
+- name: Extract Node Exporter
+  unarchive:
+    src: "/tmp/node_exporter.tar.gz"
+    dest: "/tmp"
+    remote_src: yes
+
+- name: Copy binary to /usr/local/bin
+  copy:
+    src: "/tmp/node_exporter-1.7.0.linux-amd64/node_exporter"
+    dest: "/usr/local/bin/node_exporter"
+    mode: "0755"
+    owner: prometheus
+    group: prometheus
+    remote_src: yes
+
+# ==============================================================================
+# TASK: Service & Discovery Configuration
+# DECISION: We use a JSON target file to allow Prometheus to pick up this
+#           target via File Service Discovery (File-SD) without a restart.
+# ==============================================================================
+- name: Install systemd service
+  template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+  notify: Restart Node Exporter
+
+- name: Create Prometheus Target File
+  copy:
+    dest: "/etc/prometheus/file_sd/node_exporter.json"
+    content: |
+      [
+        {
+          "targets": ["localhost:9100"],
+          "labels": { "job": "node_exporter", "instance": "prometheus-server" }
+        }
+      ]
+    owner: prometheus
+    group: prometheus
+
+- name: Ensure Node Exporter is running
+  systemd:
+    name: node_exporter
+    state: started
+    enabled: yes
