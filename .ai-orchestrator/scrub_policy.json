@@ -1,0 +1,15 @@
+{
+  "scrub_list": [
+    "ubuntu",
+    "admin",
+    "savi-finance-prod",
+    "internal-db-01",
+    "10.0.0.1"
+  ],
+  "patterns": {
+    "email": "[REDACTED_EMAIL]",
+    "ip": "[REDACTED_IP]",
+    "secret": "[REDACTED_SECRET]",
+    "custom": "[REDACTED_TERM]"
+  }
+}

@@ -1,0 +1,178 @@
+{
+  "project_name": "ai-pr-orchestrator",
+  "structure_hash": "b46f8bea0a4f26aa76de233c7942fa42",
+  "map": {
+    "__files__": [
+      ".gitignore"
+    ],
+    "git-driven-observability": {
+      "ansible": {
+        "__files__": [
+          "ansible.cfg",
+          "requirements.yml",
+          "site.yml"
+        ],
+        "inventory": {
+          "__files__": [
+            "aws_ec2.yml"
+          ]
+        },
+        "playbooks": {
+          "__files__": [
+            "deploy_scripts.yml",
+            "install_exporters.yml",
+            "provision_server.yml",
+            "register_resources.yml"
+          ]
+        },
+        "roles": {
+          "aws_resource_registrar": {
+            "tasks": {
+              "__files__": [
+                "main.yml"
+              ]
+            },
+            "templates": {
+              "__files__": [
+                "aws_resources.json.j2"
+              ]
+            }
+          },
+          "common": {
+            "tasks": {
+              "__files__": [
+                "main.yml"
+              ]
+            }
+          },
+          "custom_exporters": {
+            "handlers": {
+              "__files__": [
+                "main.yml"
+              ]
+            },
+            "tasks": {
+              "__files__": [
+                "main.yml",
+                "manage_single_exporter.yml"
+              ]
+            },
+            "templates": {
+              "__files__": [
+                "exporter.service.j2",
+                "target.json.j2"
+              ]
+            }
+          },
+          "node_exporter": {
+            "handlers": {
+              "__files__": [
+                "main.yml"
+              ]
+            },
+            "tasks": {
+              "__files__": [
+                "main.yml"
+              ]
+            },
+            "templates": {
+              "__files__": [
+                "node_exporter.service.j2"
+              ]
+            }
+          },
+          "node_exporter_remote": {
+            "tasks": {
+              "__files__": [
+                "main.yml"
+              ]
+            },
+            "templates": {
+              "__files__": [
+                "node_exporter.service.j2"
+              ]
+            }
+          },
+          "prometheus": {
+            "handlers": {
+              "__files__": [
+                "main.yml"
+              ]
+            },
+            "tasks": {
+              "__files__": [
+                "main.yml"
+              ]
+            },
+            "templates": {
+              "__files__": [
+                "prometheus.service.j2",
+                "prometheus.yml.j2"
+              ]
+            }
+          },
+          "python_platform": {
+            "tasks": {
+              "__files__": [
+                "main.yml"
+              ]
+            }
+          }
+        }
+      },
+      "exporters_configs": {
+        "__files__": [
+          "ec2_monitor.yml",
+          "s3_monitor.yml",
+          "sqs_age_monitor.yml"
+        ]
+      },
+      "python_scripts": {
+        "__files__": [
+          "ec2_monitor.py",
+          "s3_monitor.py"
+        ]
+      },
+      "terraform": {
+        "__files__": [
+          "backend.tf",
+          "main.tf",
+          "outputs.tf",
+          "providers.tf",
+          "terraform.tfvars",
+          "variables.tf"
+        ],
+        "modules": {
+          "ec2": {
+            "__files__": [
+              "main.tf",
+              "outputs.tf",
+              "variables.tf"
+            ]
+          },
+          "iam": {
+            "__files__": [
+              "main.tf",
+              "outputs.tf",
+              "variables.tf"
+            ]
+          },
+          "security_groups": {
+            "__files__": [
+              "main.tf",
+              "outputs.tf",
+              "variables.tf"
+            ]
+          },
+          "vpc": {
+            "__files__": [
+              "main.tf",
+              "outputs.tf",
+              "variables.tf"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
