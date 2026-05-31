@@ -1,6 +1,6 @@
 {
   "project_name": "ai-pr-orchestrator",
-  "structure_hash": "b46f8bea0a4f26aa76de233c7942fa42",
+  "structure_hash": "fdff441f839dbb29849fa320b5f2bd98",
   "map": {
     "__files__": [
       ".gitignore"
@@ -139,6 +139,7 @@
           "main.tf",
           "outputs.tf",
           "providers.tf",
+          "security_test.tf",
           "terraform.tfvars",
           "variables.tf"
         ],
@@ -173,6 +174,13 @@
           }
         }
       }
+    },
+    "tests": {
+      "__files__": [
+        "file_reader.py",
+        "generate_map.py",
+        "main.py"
+      ]
     }
   }
 }
