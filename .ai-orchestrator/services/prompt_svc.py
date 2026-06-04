@@ -1,60 +1,64 @@
-# -----------------------------------------------------------------------------
-# SERVICE: AI Persona & Context Orchestrator
-#
-# PURPOSE: This service manages the "System Prompts" that define the AI's 
-#          expertise and constraints. It acts as a bridge between Jira metadata 
-#          and the LLM's behavioral instructions.
-#
-# ARCHITECTURE: 
-#   - File-Based Registry: Prompts are stored as markdown (.md) files in a 
-#     central directory, allowing for easy updates without code changes.
-#   - Dynamic Mapping: Inspects Jira labels to match specific infrastructure 
-#     tasks with their corresponding expert persona (e.g., 'terraform' label 
-#     loads 'terraform.md').
-#
-# LOGIC:
-#   - Priority Routing: Iterates through ticket labels and breaks at the first 
-#     valid match found in the filesystem.
-#   - Fallback Mechanism: Provides a generic 'Senior DevOps' persona if no 
-#     specific label matches are found, ensuring the pipeline never fails 
-#     due to missing context.
-#
-# License: MIT License
-# Copyright (c) 2026 Nebat Taha
-# All rights reserved.
-# -----------------------------------------------------------------------------
 import os
 
-class PromptService:
-    def __init__(self, prompt_dir="prompts"):
-        """
-        Initializes the service and defines the source directory for prompt files.
-        """
-        self.prompt_dir = prompt_dir
+class PersonaConfigurationError(Exception):
+    """Raised when an AI orchestration persona template cannot be resolved or safely loaded."""
+    pass
 
-    def get_context(self, labels):
+class PromptService:
+    def __init__(self):
+        pass
+
+    def get_context(self, labels: list, base_path: str, profile_filename: str = None) -> str:
         """
-        Scans Jira labels and retrieves the matching system prompt from disk.
-        
-        Args:
-            labels (list): A list of strings representing the Jira ticket labels.
-            
-        Returns:
-            str: The raw text content of the system prompt to be sent to the LLM.
+        Dynamically extracts system persona configuration matrices.
+        Enforces strict fail-fast validation: resolves explicitly via profile_filename 
+        or falls back to explicit label inference if the orchestrator fails to route it.
         """
-        # Default fallback persona
-        system_content = "You are a senior DevOps engineer."
-        
-        # Mapping Logic: Iterate through labels to find a corresponding .md file
-        for label in labels:
-            file_name = f"{label.lower()}.md"
-            path = os.path.join(self.prompt_dir, file_name)
-            
-            # File I/O: Load matching expertise context
-            if os.path.exists(path):
-                with open(path, "r") as f:
-                    system_content = f.read()
-                print(f"🎯 Context Loaded: {file_name}")
-                break # Priority: Stop at the first valid matching label found
-        
-        return system_content
+        target_file = None
+
+        # 1. Resolve target file name (Prioritize dynamic registration, fallback to explicit matching)
+        if profile_filename:
+            target_file = profile_filename
+        elif labels:
+            # Normalize labels to lowercase for resilient checking
+            normalized_labels = [str(label).lower() for label in labels]
+            for label in normalized_labels:
+                if label in ["ansible", "yaml"]:
+                    target_file = "ansible.md"
+                    break
+                elif label in ["python", "script"]:
+                    target_file = "python.md"
+                    break
+                elif label in ["terraform", "hcl", "iac"]:
+                    target_file = "terraform.md"
+                    break
+
+        # 2. Halt immediately if no logical blueprint target could be deduced
+        if not target_file:
+            raise PersonaConfigurationError(
+                f"Orchestration Routing Failed: No explicit profile_filename provided, "
+                f"and labels {labels} could not be automatically mapped to a known engineering persona."
+            )
+
+        # 3. Build path and strictly validate file presence on disk
+        full_prompt_path = os.path.normpath(os.path.join(base_path, target_file))
+        print(f"📖 Attempting to load prompt profile matrix from: {full_prompt_path}")
+
+        if not os.path.exists(full_prompt_path):
+            raise PersonaConfigurationError(
+                f"Infrastructure Blueprint Missing: Resolved target file '{target_file}' "
+                f"but it does not exist at path: {full_prompt_path}. "
+                f"An engineer must define this markdown template in the workspace."
+            )
+
+        # 4. Read content securely—no hidden fallback to generic default strings
+        try:
+            with open(full_prompt_path, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if not content:
+                    raise PersonaConfigurationError(f"Target persona profile '{target_file}' is completely empty.")
+                return content
+        except Exception as e:
+            raise PersonaConfigurationError(
+                f"OS Read Failure: Failed to open or decode prompt profile at {full_prompt_path}. Reason: {e}"
+            )

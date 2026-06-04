@@ -7,10 +7,10 @@ URL = "http://localhost:8000/jira-webhook"
 # Key metadata (summary, labels) is used by the AI to determine the work scope.
 mock_payload = {
     "issue": {
-        "key": "KAN-15",
+        "key": "KAN-8",
         "fields": {
-            "summary": "Create a VPC with CIDR 172.16.0.0/16 and an S3 bucket. Name the S3 bucket 'data-172-16-0-0' (using the CIDR as a suffix). Place the file in terraform/regions/us-east-1/network.tf",
-            "labels": ["terraform", "s3"]
+            "summary": "Deploy a new ec2 instance named 'worker-node' using our internal ec2 module found in modules/ec2. The configuration file must be placed directly in the main terraform folder at 'git-driven-observability/terraform/worker.tf'.",
+            "labels": ["terraform", "ec2"]
         }
     }
 }

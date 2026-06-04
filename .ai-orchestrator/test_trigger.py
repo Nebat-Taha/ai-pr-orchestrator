@@ -32,8 +32,8 @@ mock_payload = {
     "issue": {
         "key": "KAN-7",
         "fields": {
-            "summary": "Create s3 bucket with versioning enabled ",
-            "labels": ["terraform", "s3"]
+            "summary": "Create an Ansible task file to install and start the node_exporter service on target instances. The target path should be inside git-driven-observability/ansible/playbooks/install_exporters.yml.",
+            "labels": ["ansible"]
         }
     }
 }

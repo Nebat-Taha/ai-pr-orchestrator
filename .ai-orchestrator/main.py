@@ -1,19 +1,19 @@
 import os
 import sys
 import json
+import re
 import ollama
 from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
 from services.github_svc import GitHubService
-from services.prompt_svc import PromptService
+from services.prompt_svc import PromptService, PersonaConfigurationError
 from services.jira_svc import JiraService
 
 # --- PERMANENT PATH ANCHORS ---
-# Since main.py lives inside .ai-orchestrator/, its directory is our package home.
 ORCHESTRATOR_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(ORCHESTRATOR_DIR, '..'))
 
-# Insert tools/ into the system path natively
+# Insert tools/ into system path natively so hidden modules load cleanly
 tools_dir = os.path.join(ORCHESTRATOR_DIR, 'tools')
 if tools_dir not in sys.path:
     sys.path.insert(0, tools_dir)
@@ -21,8 +21,9 @@ if tools_dir not in sys.path:
 # --- Clean Local Module Imports ---
 try:
     from generate_map import generate_repo_map
+    from secure_read_file import secure_read_file  
     from validate_output import verify_clean_content
-    print("🛡️  All core security modules successfully linked.")
+    print("🛡️  Polymorphic Multi-Language Routing Engine Synchronized.")
 except ImportError as e:
     print(f"❌ Critical Import Error: {e}")
     sys.exit(1)
@@ -33,96 +34,210 @@ prompt_svc = PromptService()
 jira_svc = JiraService() 
 
 class JiraPayload(BaseModel):
+    """Schema for incoming Jira Webhook data."""
     issue: dict
 
-def start_orchestration(ticket_id: str, summary: str, labels: list):
-    """Background task handling JIT context gathering, secure generation, and verification."""
+class LanguageProfileNotFoundError(Exception):
+    """Custom exception to explicitly halt orchestration when language routing fails."""
+    pass
 
-    # -------------------------------------------------------------------------
-    # 🔍 NEW: JUST-IN-TIME REPOSITORY MAPPING
-    # -------------------------------------------------------------------------
-    map_json_path = os.path.join(ORCHESTRATOR_DIR, 'repo_map.json')
-    print(f"\n🔍 Step 1: Evaluating repository state for {ticket_id}...")
+def load_language_profile(target_lang: str) -> dict:
+    """
+    Safely reads execution specifications from the external schema.
+    Enforces a strict Fail-Fast design: If the language is missing or 
+    the schema is corrupted, it raises an exception to abort the pipeline immediately.
+    """
+    profiles_path = os.path.join(ORCHESTRATOR_DIR, 'language_profiles.json')
     
-    # Refresh the map (skips if file structure hash hasn't changed)
+    if not os.path.exists(profiles_path):
+        raise LanguageProfileNotFoundError(f"❌ CRITICAL: Language registry schema missing at {profiles_path}")
+
+    try:
+        with open(profiles_path, 'r', encoding='utf-8') as f:
+            profiles = json.load(f)
+            
+        if target_lang in profiles:
+            return profiles[target_lang]
+        else:
+            raise LanguageProfileNotFoundError(
+                f"❌ UNKNOWN RUNTIME: The detected label target '{target_lang}' is not registered in language_profiles.json"
+            )
+            
+    except json.JSONDecodeError as e:
+        raise LanguageProfileNotFoundError(
+            f"❌ CORRUPTED SCHEMA: language_profiles.json failed to parse due to a syntax error: {e}"
+        )
+
+def start_orchestration(ticket_id: str, summary: str, labels: list):
+    """
+    Agentic Multi-Pass Loop: Handles dynamic tool requests from the LLM, 
+    injects sanitized context JIT, and verifies output security across languages.
+    """
+    # 🎯 1. DYNAMIC LANGUAGE PROFILE ROUTING (STRICT MODE)
+    target_lang = None
+    profiles_path = os.path.join(ORCHESTRATOR_DIR, 'language_profiles.json')
+    
+    if os.path.exists(profiles_path):
+        try:
+            with open(profiles_path, 'r', encoding='utf-8') as f:
+                known_langs = json.load(f).keys()
+                # Hunt for the first matching registered label context
+                for label in [l.lower() for l in labels]:
+                    if label in known_langs:
+                        target_lang = label
+                        break
+        except Exception:
+            print("❌ Critical failure accessing language_profiles.json configuration data.")
+            return
+
+    # If no explicitly registered label was attached to the incoming request, reject it immediately
+    if not target_lang:
+        print(f"🛑 ABORT: Incoming ticket {ticket_id} has no valid multi-language routing labels attached. Labels received: {labels}")
+        return
+
+    try:
+        profile = load_language_profile(target_lang)
+        print(f"🎯 Routing Execution Flow through Dynamic Profile: [{target_lang.upper()}]")
+    except LanguageProfileNotFoundError as err:
+        print(f"🛑 PIPELINE ABORTED: {err}")
+        return
+
+    # JIT Repository Mapping
+    map_json_path = os.path.join(ORCHESTRATOR_DIR, 'repo_map.json')
+    print(f"\n🔍 Scanning repository layout context...")
     generate_repo_map(PROJECT_ROOT, map_json_path)
     
-    # Read the updated repo structure to feed to the LLM context
     try:
         with open(map_json_path, 'r', encoding='utf-8') as f:
             repo_context_tree = f.read()
     except Exception as e:
-        print(f"⚠️ Failed to read repository map context: {e}")
         repo_context_tree = "{}"
 
-
-    # Build prompt path relative to this self-contained directory
+    # Load system persona prompt dynamically passing matched profile criteria
     prompt_path = os.path.join(ORCHESTRATOR_DIR, 'prompts')
-    system_prompt = prompt_svc.get_context(labels, base_path=prompt_path)
     
-    # 2. AI GENERATION CONTEXT ASSEMBLY
-    # We cleanly inject the real-time file tree directly into the query prompt
-    prompt_query = f"""
-    PROCESS TICKET {ticket_id}: {summary}. 
+    try:
+        # FIXED: Enforce fail-fast execution using our strict custom exception handling
+        system_prompt = prompt_svc.get_context(labels, base_path=prompt_path, profile_filename=profile.get("prompt_file"))
+    except PersonaConfigurationError as err:
+        print(f"🛑 ORCHESTRATION ABORTED (Prompt Resolution Failed): {err}")
+        return
+    
+    # Initialize the base query
+    prompt_query = f"""PROCESS TICKET {ticket_id}: {summary}. 
     STRICT ADHERENCE TO SYSTEM SCHEMA REQUIRED.
     
     CURRENT REPOSITORY STRUCTURE:
-    {repo_context_tree}
-    """
+    {repo_context_tree}"""
 
-    print(f"\n🤖 AI (Phi-3) is processing {ticket_id} context... (Please wait)")
-    try:
-        response = ollama.generate(
-            model='phi3',
-            system=system_prompt,
-            prompt=prompt_query
-        )
-        raw_response = response['response'] 
+    # --- AGENTIC LOOP STATE ---
+    max_loops = 3
+    current_loop = 0
+    conversation_history = [
+        {"role": "system", "content": system_prompt}, # FIXED: Corrected capitalization typo
+        {"role": "user", "content": prompt_query}
+    ]
+    
+    ai_generated_code = ""
+    # Smart extension allocation based on explicit runtime context
+    default_ext = ".tf" if target_lang == "terraform" else (".yml" if target_lang == "ansible" else ".py")
+    target_path = f"infrastructure/{ticket_id}{default_ext}"
 
-        if "PATH:" in raw_response:
-            raw_response = raw_response[raw_response.find("PATH:"):]
-       
-        print(f"✅ AI finished generating {len(raw_response)} characters.") 
+    print(f"\n🧠 Starting Agentic Pipeline Execution for {ticket_id}...")
 
-        # DYNAMIC PATH & CODE PARSING
-        target_path = f"infrastructure/{ticket_id}.tf"
-        ai_generated_code = raw_response
+    while current_loop < max_loops:
+        current_loop += 1
+        print(f"🤖 [Pass {current_loop}] Invoking local model (Phi-3)...")
+        
+        try:
+            # Native format matching Ollama's local chat structures
+            response = ollama.chat(
+                model='phi3',
+                messages=conversation_history
+            )
+            raw_response = response['message']['content']
+            
+            # Append the LLM's raw thoughts to history so it remembers what it said
+            conversation_history.append({"role": "assistant", "content": raw_response})
 
-        if "PATH:" in raw_response and "CODE:" in raw_response:
-            try:
-                parts = raw_response.split("CODE:")
-                path_part = parts[0].replace("PATH:", "").strip()
-                code_part = parts[1].strip()
+            # 🛑 CHECK: Did the AI request a tool call to read a file?
+            tool_match = re.search(r"TOOL_REQUEST:\s*READ_FILE\[(.*?)\]", raw_response)
+            
+            if tool_match:
+                requested_relative_path = tool_match.group(1).strip()
+                print(f"🛠️  [TOOL CALL]: Agent requested to read: {requested_relative_path}")
                 
-                if path_part:
-                    target_path = path_part
-                ai_generated_code = code_part
-                print(f"📍 AI suggested path: {target_path}")
-            except Exception as e:
-                print(f"⚠️ Parsing failed, using default pathing. Error: {e}")
+                # Resolve path absolute relative to PROJECT_ROOT
+                full_file_path = os.path.abspath(os.path.join(PROJECT_ROOT, requested_relative_path))
+                
+                # Execute Inbound Guardrail Sanitizer
+                print(f"🛡️  Executing Inbound Guardrail on tool target...")
+                sanitized_contents, safe_error = secure_read_file(full_file_path)
+                
+                # Feed the data right back to the LLM as a tool feedback response
+                tool_feedback = f"""
+                --- [TOOL RESPONSE] ---
+                File Contents for '{requested_relative_path}' (Sanitized & Redacted):
+                ----------------------------------------
+                {sanitized_contents if not safe_error else f"Error reading file: {safe_error}"}
+                ----------------------------------------
+                Analyze these contents to fulfill the schema target.
+                """
+                conversation_history.append({"role": "user", "content": tool_feedback})
+                
+                # Loop back to let the LLM look at the freshly read file data
+                continue
 
-        # CODE CLEANING
-        ai_generated_code = (
-            ai_generated_code.replace("```hcl", "")
-            .replace("```terraform", "")
-            .replace("```", "")
-        )
-        
-        # ISOLATE CODE
-        keywords = ["resource", "terraform {", "module", "variable", "data"]
-        start_index = -1
-        for kw in keywords:
-            idx = ai_generated_code.find(kw)
-            if idx != -1:
-                if start_index == -1 or idx < start_index:
-                    start_index = idx
-        
-        if start_index != -1:
-            ai_generated_code = ai_generated_code[start_index:]
-         
-    except Exception as e:
-        print(f"❌ AI Generation Failed: {e}")
+            # 🏁 SUCCESS: No tool call requested. The AI has provided its final response.
+            print("✅ AI reached execution conclusion. Parsing artifact...")
+            
+            # Extract downstream markers
+            if "PATH:" in raw_response:
+                working_text = raw_response[raw_response.find("PATH:"):]
+                if "CODE:" in working_text:
+                    try:
+                        parts = working_text.split("CODE:")
+                        path_part = parts[0].replace("PATH:", "").strip()
+                        code_part = parts[1].strip()
+                        
+                        if path_part:
+                            target_path = path_part
+                        ai_generated_code = code_part
+                    except Exception as e:
+                        print(f"⚠️  Parsing failed, utilizing defaults. Error: {e}")
+                        ai_generated_code = working_text
+            else:
+                ai_generated_code = raw_response
+                
+            break  # Break out of loop since we have code
+
+        except Exception as e:
+            print(f"❌ AI Generation Exception inside loop: {e}")
+            return
+
+    if not ai_generated_code:
+        print("❌ Agent pipeline closed without generating code artifacts.")
         return
+
+    # 🧼 PLUGGABLE SCHEMA-DRIVEN CLEANING MECHANISM
+    for wrapper in profile.get("wrappers", []):
+        ai_generated_code = ai_generated_code.replace(wrapper, "")
+    
+    # Isolate Code dynamically via runtime profile keyword configurations
+    start_index = -1
+    for kw in profile.get("keywords", []):
+        idx = ai_generated_code.find(kw)
+        if idx != -1:
+            if start_index == -1 or idx < start_index:
+                start_index = idx
+                
+    if start_index != -1:
+        ai_generated_code = ai_generated_code[start_index:]
+
+    # 👀 Visual Inspection
+    print("\n--- [RAW AI GENERATED CODE ARTIFACT] ---")
+    print(ai_generated_code)
+    print("----------------------------------------\n")
 
     # --- OUTBOUND SECURITY GATEKEEPER LAYER ---
     print(f"🛡️  Scanning generated code for {ticket_id} before code commit...")
@@ -135,28 +250,26 @@ def start_orchestration(ticket_id: str, summary: str, labels: list):
     
     print("✅ Security Scan Passed. Code is clean of raw infrastructure secrets.")
 
-    # GITHUB OPERATIONS (Now targeted explicitly relative to the PROJECT_ROOT)
+    # GITHUB OPERATIONS
     try:
         pr_url = gh_service.create_branch_and_pr(
             ticket_id=ticket_id,
             file_path=target_path,
             content=ai_generated_code,
-            commit_message=f"feat: AI infrastructure generation for {ticket_id}",
-            repo_root=PROJECT_ROOT  # Explicit target tracking
+            commit_message=f"feat: AI dynamic {target_lang} generation for {ticket_id}",
+            repo_root=PROJECT_ROOT
         )
         print(f"--- SUCCESS --- PR: {pr_url}")
-
-        jira_status = jira_svc.add_comment(ticket_id, pr_url)
-        if jira_status == 201:
-            print(f"💬 Commented on Jira ticket {ticket_id}")
-        else:
-            print(f"⚠️ PR created, but Jira comment failed (Status: {jira_status})")
-
+        jira_svc.add_comment(ticket_id, pr_url)
     except Exception as e:
         print(f"--- FAILED --- Error: {e}")
 
 @app.post("/jira-webhook")
 async def jira_webhook(payload: JiraPayload, background_tasks: BackgroundTasks):
+    """
+    Main webhook entry point. Parses the Jira payload and hands off 
+    the heavy lifting to a background worker.
+    """
     issue_key = payload.issue.get("key")
     fields = payload.issue.get("fields", {})
     summary = fields.get("summary", "No summary provided")
@@ -166,3 +279,4 @@ async def jira_webhook(payload: JiraPayload, background_tasks: BackgroundTasks):
     background_tasks.add_task(start_orchestration, issue_key, summary, labels)
     
     return {"status": "accepted", "ticket": issue_key}
+

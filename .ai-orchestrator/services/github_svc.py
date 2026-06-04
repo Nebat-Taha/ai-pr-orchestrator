@@ -21,7 +21,7 @@
 # All rights reserved.
 # -----------------------------------------------------------------------------
 import os
-from github import Github, InputGitAuthor  # <--- Update this import
+from github import Github, InputGitAuthor  
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -40,10 +40,12 @@ class GitHubService:
             print(f"❌ GitHub Init Error: {e}")
             self.repo = None
 
-    def create_branch_and_pr(self, ticket_id, file_path, content, commit_message):
+    def create_branch_and_pr(self, ticket_id, file_path, content, commit_message, repo_root=None):
         """
-        Orchestrates the full Git lifecycle for an AI-generated change:
+        Orchestrates the full Git lifecycle for an AI-generated change via PyGithub:
         Branching -> File Creation/Update -> Pull Request.
+        
+        Includes optional repo_root argument to ensure architectural synchronization.
         """
         if not self.repo:
             raise Exception("GitHub repository not initialized.")
@@ -63,7 +65,7 @@ class GitHubService:
             # Silence exception if branch already exists (supports idempotency)
             print(f"Branch {new_branch} already exists. Proceeding...")
 
-        # 2. FILE PERSISTENCE: Handle both new files and existing file updates
+        # 2. FILE PERSISTENCE: Handle both new files and existing file updates via GitHub API
         try:
             # Attempt to update existing file (requires current file SHA)
             contents = self.repo.get_contents(file_path, ref=new_branch)
@@ -76,8 +78,9 @@ class GitHubService:
                 author=bot_author,  # Attribution for the Git log
                 committer=bot_author # Metadata for the Git log
             )
+            print(f"📝 Updated existing file {file_path} on branch {new_branch}")
         except Exception:
-            # Fallback: Create file if it does not exist in the target branch
+            # Fallback: Create file if it does not exist in the target branch yet
             self.repo.create_file(
                 path=file_path,
                 message=commit_message,
@@ -86,6 +89,7 @@ class GitHubService:
                 author=bot_author,  
                 committer=bot_author
             )
+            print(f"📝 Created new file {file_path} on branch {new_branch}")
 
         # 3. COLLABORATION: Open a PR for peer review or automated validation
         try:

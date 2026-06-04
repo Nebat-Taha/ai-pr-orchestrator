@@ -1,0 +1,18 @@
+{
+  "terraform": {
+    "prompt_file": "terraform.md",
+    "wrappers": ["```hcl", "```terraform", "```"],
+    "keywords": ["resource", "terraform {", "module", "variable", "data", "provider"]
+  },
+  "ansible": {
+    "prompt_file": "ansible.md",
+    "wrappers": ["```yaml", "```ansible", "```"],
+    "keywords": ["- name:", "hosts:", "tasks:", "vars:", "---"]
+    
+  },
+  "python": {
+    "prompt_file": "python.md",
+    "wrappers": ["```python", "```py", "```"],
+    "keywords": ["import ", "from ", "def ", "class "]
+  }
+}
