@@ -1,0 +1,41 @@
+---
+- name: Install and start node exporter service on target instances
+  hosts: all
+  become: yes
+  tags: ["managed_by": "AI-Orchestrator", "project": "Jira-Automation"]
+  roles:
+    - role: custom_exporters
+      vars:
+        instance_type: t2.micro
+        
+  tasks:  
+    - name: Install node exporter service package (if not present)
+      apt: 
+        name: exporter-node                     # Use the correct repository for your Linux distribution here
+        state: latest
+      
+    - name: Copy default configuration file to target instances if required
+      copy:
+        src: "{{ playbook_dir }}/files/default_exporter.conf"
+        dest: "/etc/node-exporter/"               # Adjust destination path as necessary for your environment 
+      
+    - name: Start the node exporter service with default configuration file, if needed
+      systemd:                           # This is a placeholder; modify according to your Linux distribution and package manager syntax (e.g., yum/apt)
+        state: started                     # Again, adapt this command based on your specific requirements for starting services 
+      
+    - name: Enable the node exporter service so that it starts at boot time if required
+      systemd:
+        state: enabled                # Ensure to enable and start a well-behaved configuration where such actions are safe. Not all systems use or support `systemd`. 
+      
+    - name: Deploy customized template for node exporter service with specific configurations (if required)  
+      template:                        # This task creates the service files based on your templates, which may include user/group names and system-specific directives. Adjust accordingly.
+        src: "{{ playbook_dir }}/files/node_exporter.service" 
+        dest: "/etc/systemd/system/"    # This is a common destination for custom service files on many Linux distributions, but adjust as necessary  
+      
+      notify:                          # Systemd will attempt to restart the exporter service after any file modification that affects its behavior. Adjust 'notify' usage accordingly and ensure proper handlers are defined if using Ansible V4.0+ where `systemd` module is not available anymore, but system tasks can be used instead
+      
+  handlers:  
+    - name: restart node exporter service to pick up changes (if required)        # Ensure that your handler restarts the correct services without causing downtime if they are already running. This example assumes a simple reload of the daemon which might not always be safe depending on configuration state and system setup  
+      systemd:                           # As mentioned before, replace with appropriate commands for restarting or reloading exporter service as per your Linux distribution 
+        name: node-exporter.service     # Name of the Node Exporter Service file created in a previous task   
+        daemon_reload: yes             # Optionally force systemd to reload configurations on all services that might have been modified by this playbook  
