@@ -1,0 +1,10 @@
+---
+# Ensure the file starts with "name" and contains action sentences as required by standards STATEMENT1
+- name: Start Node Exporter service on target instances to gather system metrics for observability purposes
+  ansible.builtin.service:
+    name: node_exporter
+    state: started
+  become: yes # Ensure the role is run with elevated privileges when starting services STATEMENT2
+  tags:
+    - "managed_by: AI-Orchestrator"
+    - "project: Jira-Automation"
