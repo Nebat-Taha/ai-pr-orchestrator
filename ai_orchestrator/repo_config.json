@@ -1,0 +1,4 @@
+{
+  "exclude_dirs": [".git", "__pycache__", "node_modules", "venv", ".ai-orchestrator", "secrets"],
+  "exclude_files": [".DS_Store", "terraform.tfstate", ".env", "repo_map.json"]
+}

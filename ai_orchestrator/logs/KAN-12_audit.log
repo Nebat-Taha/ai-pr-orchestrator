@@ -1,0 +1,12 @@
+[2026-06-16 18:58:49] [LLM_THOUGHT]
+[PATH: ../git-driven-observability/ansible/roles/common/tasks/main.yml]
+CODE:
+```hcl2
+# Common tasks that apply to all environments and roles, if needed here for context...
+
+resource "aws_iam__eks_fargate_profile" "default" {
+  name    = "${var.project}-${var.managed_by}-common-role"
+  task_definition_family = local.task_definition_family or var.ecs_task_definition_type # Assume this is set elsewhere in the variables file from 'modules/ec2'...
+}
+```
+----------------------------------------

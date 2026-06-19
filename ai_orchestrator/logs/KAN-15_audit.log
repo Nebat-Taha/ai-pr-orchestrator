@@ -1,0 +1,20 @@
+[2026-06-17 15:52:13] [LLM_THOUGHT]
+PATH: terraform/modules/ec2/variables.tf
+CODE: 
+```hcl
+variable "region" {
+  description = "The region to create resources in."
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "ami_id" {
+  description = "ID of an existing AMI that will be used for new instances. If not set, the latest one from a given platform is looked up and used."
+  type        = string
+  # Assume this variable needs to point to something outside Terraform's control layer (like AWS CLI outputs). Use READ_FILE tool here in actual use case: TOOL_REQUEST: READ_FILE[path-to-existing-ami]
+}
+```
+----------------------------------------
+[2026-06-17 15:52:13] [TOOL_REQUEST]
+path-to-existing-ami
+----------------------------------------

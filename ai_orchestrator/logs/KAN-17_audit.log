@@ -1,0 +1,13 @@
+[2026-06-17 17:02:12] [LLM_THOUGHT]
+```yaml
+---
+# Filename: role/aws-ec2-setup-eksctl-instance/tasks/019_create_and_configure_iam.tf
+# Purpose: To create and configure an IAM User with the necessary policies for running EC2 instances in AWS, specifically tailored to manage EKS clusters using Terraform.
+# Tags: ManagedBy = "AI-Orchestrator", Project = "Jira-Automation"
+resources:
+  - name: aws_iam_user
+    kind: IAMUser 
+    properties:
+      create_and_configure_iam: true
+```
+----------------------------------------

@@ -1,0 +1,15 @@
+[2026-06-16 19:34:23] [LLM_THOUGHT]
+PATH: git-driven-observability/ansible/roles/aws_resource_registrar/tasks/main.yml
+CODE: 
+```hcl
+# Terraform Code Begins
+
+module "ec2" {
+  source = "${path.root + "/git-driven-observability/ansible/modules/ec2"}"
+  
+  access_key = var.aws_access_key # Required Input Variable from 'variables.tf' inside the ec2 module directory
+  secret_key = var.aws_secret_key # Required Input Variable from 'variables.tf' inside the ec2 module directory
+}
+# Terraform Code Ends
+```
+----------------------------------------

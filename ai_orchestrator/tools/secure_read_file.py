@@ -50,4 +50,4 @@ def secure_read_file(file_path, project_root):
     content = re.sub(r"(\[REDACTED_TERM\]|ubuntu):([^\s\"';|]+)", 
                      r"\1:[REDACTED_SECRET]", content)
 
-    return content
+    return content, None 

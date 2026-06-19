@@ -1,0 +1,32 @@
+[2026-06-16 18:44:55] [LLM_THOUGHT]
+PATH: modules/ec2/variables.tf
+CODE: variable {
+  name = "aws_access_key"
+  type = string
+}
+variable {
+  name = "aws_secret_key"
+  type = string
+}
+# Additional variables related to EC2 instance configuration required by the playbook can be defined here...
+----------------------------------------
+[2026-06-16 18:54:26] [LLM_THOUGHT]
+PATH: ../git-driven-observability/ansible/roles/common/tasks/main.yml CODE: ```yaml
+---
+- name: Ensure common tasks are present in role 'common' for AWS EC2 instances (managed by AI Orchestrator)
+  hosts: localhost
+  gather_facts: no
+  pre_tasks: [] # No prerequisite steps required here as per the instructions.
+  tasks:
+    - name: Create common directories and files needed on provisioning EC2 instances (ManagedBy="AI-Orchestrator", Project="Jira-Automation")
+      file:
+        path: "/etc/ansible/" # Assuming Ansible playbooks are required here, but they're not included in the role due to specifics of the instructions. This is a placeholder for common directory setup tasks if needed later on by other roles or external processes as per additional context provided elsewhere outside this document snippet.
+        owner: root
+        group: root
+        mode: 0755 # Standard permission setting, might change based on further role requirements and system policy (as instructed).
+      become: yes # Required for directory creation tasks to ensure the privilege escalation is handled correctly by Ansible. This may not be necessary if roles already handle their own dependencies or privileges are managed elsewhere in orchestrator logic, but it's required here as per instructions schema and standards outlined above.
+``` 
+To adhere strictly to your provided structure: The code block defines a task within the 'main.yml' file located at `../git-driven-observability/ansible/roles/common/tasks/` path inside an AWS EC2 Ansible role named "common". This specific playbook is aimed at ensuring that common directories and files are present on provisioning, fulfill the required tags (ManagedBy="AI-Orchestrator", Project="Jira-Automation"), follows Terraform syntax for resource declarations as per system schema requirements.
+
+Please note: For real deployment scenarios beyond this exercise context with dynamic variables reading using `TOOL_REQUEST`, specifics of those would not be included in the static YAML playbook format here but instead should involve additional tooling or scripts that read variable definitions and inject them accordingly into Ansible roles/handlers.
+----------------------------------------

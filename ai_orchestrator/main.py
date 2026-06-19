@@ -1,32 +1,37 @@
+"""
+AI-Orchestrator: Main Execution Engine
+Description: This is the central entry point for the AI-Orchestrator. It listens for 
+             Jira webhooks, routes requests based on language profiles, manages the 
+             LLM agentic loop (recursive tool calling), and acts as the gatekeeper 
+             between LLM output and the Git repository.
+             
+License: MIT License
+Copyright (c) 2026 Nebat Taha / Savi Finance
+
+Architecture:
+- Webhook Layer: FastAPI handles async incoming requests from Jira.
+- Routing Layer: Dynamic language profiles allow for multi-language support.
+- Agentic Layer: Phi-3 LLM runs in a loop, capable of requesting file reads.
+- Security Layer: Inbound/Outbound sanitization and regex-based leakage detection.
+"""
+
 import os
 import sys
 import json
 import re
 import ollama
+import datetime 
 from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
-from services.github_svc import GitHubService
-from services.prompt_svc import PromptService, PersonaConfigurationError
-from services.jira_svc import JiraService
+from ai_orchestrator.services.github_svc import GitHubService
+from ai_orchestrator.services.prompt_svc import PromptService, PersonaConfigurationError
+from ai_orchestrator.services.jira_svc import JiraService
+from ai_orchestrator.tools.generate_map import generate_repo_map
+from ai_orchestrator.tools.secure_read_file import secure_read_file
+from ai_orchestrator.tools.validate_output import verify_clean_content
 
-# --- PERMANENT PATH ANCHORS ---
 ORCHESTRATOR_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(ORCHESTRATOR_DIR, '..'))
-
-# Insert tools/ into system path natively so hidden modules load cleanly
-tools_dir = os.path.join(ORCHESTRATOR_DIR, 'tools')
-if tools_dir not in sys.path:
-    sys.path.insert(0, tools_dir)
-
-# --- Clean Local Module Imports ---
-try:
-    from generate_map import generate_repo_map
-    from secure_read_file import secure_read_file  
-    from validate_output import verify_clean_content
-    print("🛡️  Polymorphic Multi-Language Routing Engine Synchronized.")
-except ImportError as e:
-    print(f"❌ Critical Import Error: {e}")
-    sys.exit(1)
 
 app = FastAPI()
 gh_service = GitHubService()
@@ -68,6 +73,20 @@ def load_language_profile(target_lang: str) -> dict:
             f"❌ CORRUPTED SCHEMA: language_profiles.json failed to parse due to a syntax error: {e}"
         )
 
+
+def log_audit_trail(ticket_id, entry_type, content):
+    """Writes agentic decisions and tool interactions to a ticket-specific log file."""
+    # Define local path to ensure consistency
+    ORCHESTRATOR_DIR = os.path.dirname(os.path.abspath(__file__))
+    log_dir = os.path.join(ORCHESTRATOR_DIR, 'logs')
+    os.makedirs(log_dir, exist_ok=True)
+    
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_file = os.path.join(log_dir, f"{ticket_id}_audit.log")
+    
+    with open(log_file, 'a', encoding='utf-8') as f:
+        f.write(f"[{timestamp}] [{entry_type.upper()}]\n{content}\n" + "-"*40 + "\n")
+
 def start_orchestration(ticket_id: str, summary: str, labels: list):
     """
     Agentic Multi-Pass Loop: Handles dynamic tool requests from the LLM, 
@@ -107,6 +126,8 @@ def start_orchestration(ticket_id: str, summary: str, labels: list):
     print(f"\n🔍 Scanning repository layout context...")
     generate_repo_map(PROJECT_ROOT, map_json_path)
     
+    # print(f"DEBUG: Loading map from: {map_json_path}")
+
     try:
         with open(map_json_path, 'r', encoding='utf-8') as f:
             repo_context_tree = f.read()
@@ -129,7 +150,9 @@ def start_orchestration(ticket_id: str, summary: str, labels: list):
     
     CURRENT REPOSITORY STRUCTURE:
     {repo_context_tree}"""
-
+    # Temporary Debug
+    # print(f"DEBUG: Repository Context Length: {len(repo_context_tree)} characters")
+    # print(f"DEBUG: Sample Context: {repo_context_tree[:500]}")
     # --- AGENTIC LOOP STATE ---
     max_loops = 3
     current_loop = 0
@@ -157,6 +180,17 @@ def start_orchestration(ticket_id: str, summary: str, labels: list):
             )
             raw_response = response['message']['content']
             
+            # --- INSERT GUARDRAIL HERE ---
+            if "CODE:" in raw_response and "TOOL_REQUEST" not in raw_response:
+                print("⚠️  Guardrail triggered: AI attempted to generate code without reading files.")
+                conversation_history.append({"role": "user", "content": "CRITICAL ERROR: You attempted to write code without using the READ_FILE tool first. You are FORBIDDEN from writing code until you have inspected the required module definition. READ the relevant variables.tf file now."})
+                continue # This skips the rest of the loop and forces the AI to try again
+
+            # Log the LLM's thought process
+            log_audit_trail(ticket_id, "LLM_THOUGHT", raw_response)
+
+
+            
             # Append the LLM's raw thoughts to history so it remembers what it said
             conversation_history.append({"role": "assistant", "content": raw_response})
 
@@ -166,13 +200,27 @@ def start_orchestration(ticket_id: str, summary: str, labels: list):
             if tool_match:
                 requested_relative_path = tool_match.group(1).strip()
                 print(f"🛠️  [TOOL CALL]: Agent requested to read: {requested_relative_path}")
-                
+                # --- ADD THIS: Log the tool request ---
+                log_audit_trail(ticket_id, "TOOL_REQUEST", requested_relative_path)
+
+
                 # Resolve path absolute relative to PROJECT_ROOT
                 full_file_path = os.path.abspath(os.path.join(PROJECT_ROOT, requested_relative_path))
                 
                 # Execute Inbound Guardrail Sanitizer
                 print(f"🛡️  Executing Inbound Guardrail on tool target...")
-                sanitized_contents, safe_error = secure_read_file(full_file_path)
+                # sanitized_contents, safe_error, _ = secure_read_file(PROJECT_ROOT, full_file_path)
+                result = secure_read_file(requested_relative_path, PROJECT_ROOT)
+
+# Handle the result
+                if result.startswith("ERROR:"):
+                    sanitized_contents = ""
+                    safe_error = result
+                else:
+                    sanitized_contents = result
+                    safe_error = None
+                # --- ADD THIS: Log what the tool actually returned ---
+                log_audit_trail(ticket_id, "TOOL_RESPONSE", sanitized_contents if not safe_error else safe_error)
                 
                 # Feed the data right back to the LLM as a tool feedback response
                 tool_feedback = f"""
@@ -233,6 +281,15 @@ def start_orchestration(ticket_id: str, summary: str, labels: list):
                 
     if start_index != -1:
         ai_generated_code = ai_generated_code[start_index:]
+
+    # 👇Strip out inline comments completely before the security scan
+    # This prevents conversational mentions of words like 'ubuntu' from triggering a block
+    clean_code_only = ""
+    for line in ai_generated_code.splitlines():
+        # Strip trailing comments or comment-only lines for the security gate
+        stripped_line = re.sub(r'#.*$', '', line).strip()
+        if stripped_line:
+            clean_code_only += line + "\n"
 
     # 👀 Visual Inspection
     print("\n--- [RAW AI GENERATED CODE ARTIFACT] ---")

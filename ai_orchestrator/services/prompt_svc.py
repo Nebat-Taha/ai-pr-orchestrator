@@ -12,7 +12,8 @@ class PromptService:
         """
         Dynamically extracts system persona configuration matrices.
         Enforces strict fail-fast validation: resolves explicitly via profile_filename 
-        or falls back to explicit label inference if the orchestrator fails to route it.
+        or falls back to explicit label inference if the orchestrator fails to route it.and couples them 
+        with the global platform standards matrix.
         """
         target_file = None
 
@@ -42,6 +43,7 @@ class PromptService:
 
         # 3. Build path and strictly validate file presence on disk
         full_prompt_path = os.path.normpath(os.path.join(base_path, target_file))
+        standards_path = os.path.normpath(os.path.join(base_path, "standards.md"))
         print(f"📖 Attempting to load prompt profile matrix from: {full_prompt_path}")
 
         if not os.path.exists(full_prompt_path):
@@ -53,12 +55,19 @@ class PromptService:
 
         # 4. Read content securely—no hidden fallback to generic default strings
         try:
+            # Load the language-specific instruction rules
             with open(full_prompt_path, 'r', encoding='utf-8') as f:
-                content = f.read().strip()
-                if not content:
-                    raise PersonaConfigurationError(f"Target persona profile '{target_file}' is completely empty.")
-                return content
+                persona_content = f.read().strip()
+            
+            # Load the global engineering repository standards if present
+            standards_content = ""
+            if os.path.exists(standards_path):
+                with open(standards_path, 'r', encoding='utf-8') as f:
+                    standards_content = f.read().strip()
+
+            # Merge the knowledge bases natively so the model sees both layers
+            combined_context = f"{standards_content}\n\n{persona_content}"
+            return combined_context
+
         except Exception as e:
-            raise PersonaConfigurationError(
-                f"OS Read Failure: Failed to open or decode prompt profile at {full_prompt_path}. Reason: {e}"
-            )
+            raise PersonaConfigurationError(f"Failed to compile system prompt context. Reason: {e}")

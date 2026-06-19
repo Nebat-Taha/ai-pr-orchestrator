@@ -7,9 +7,9 @@ URL = "http://localhost:8000/jira-webhook"
 # Key metadata (summary, labels) is used by the AI to determine the work scope.
 mock_payload = {
     "issue": {
-        "key": "KAN-8",
+        "key": "KAN-18",
         "fields": {
-            "summary": "Deploy a new ec2 instance named 'worker-node' using our internal ec2 module found in modules/ec2. The configuration file must be placed directly in the main terraform folder at 'git-driven-observability/terraform/worker.tf'.",
+            "summary": "Read the 'modules/ec2' directory structure and then read the variables.tf file from that module to identify required inputs. Then, generate the worker.tf file using that module.",
             "labels": ["terraform", "ec2"]
         }
     }

@@ -1,0 +1,31 @@
+[2026-06-16 17:52:12] [LLM_THOUGHT]
+PATH: git-driven-observability/ansible/roles/custom_exporters/tasks/install_start.yml
+CODE:
+```yaml
+---
+# Install and start node_exporter service on target instances using Ansible Playbooks
+- name: Install Node Exporter as a systemd service for continuous monitoring of infrastructure metrics within the git-driven observability framework. 
+  hosts: all # Replace 'all' with your specific host group if necessary in playbook context variables (e.g., groups['production']).
+  become: yes # Preferably set to no ('False') unless privilege escalation is required for the operation, such as root access needed on target instances.
+  tasks:
+    - name: Install node_exporter service package using Ansible pip module if Python installation isn't available or ensure its presence first. (if exists)
+      ansible.builtin.pip: # Replace with appropriate package management command based on your environment, for example use 'package' in yum/apt repositories instead of the following pipeline install task.
+        name: node_exporter 
+        state: present  
+      
+    - name: Create systemd service unit file using Ansible template module if it does not exist already to manage Node Exporter as a background process on Linux systems which utilize systemd for services management. Ensure that this task is executed after the package installation or provide an appropriate conditional statement prioritizing node_exporter's presence in your playbook context variables (e.g., vars['node_exporter']).
+      ansible.builtin.template:  # Replace 'template' with 'include_tasks' and include a file containing template block definitions if using included tasks approach for the service unit definition task, typically this is done through handlers to ensure idempotence of playbook executions (e.g., use handler named notify_node_exporter).
+        src: node_exporter/service.j2  # Path to your custom template defining systemd's Unit file for Node Exporter service which should be located in the 'roles/custom_exporters/' directory, typically containing standard unit definition directives configured with appropriate user and group permissions along with ExecStart parameters correspondingly designed by YAML syntax.
+        dest: /etc/systemd/system/node_exporter.service # The final destination where Node Exporter service Unit file will be written on target instance(s) ensuring proper system-wide visibility for the Service Manager to control it upon application of playbook executions through appropriate handlers task definition (e.g., handler named start_custom_exporters).
+      
+    - name: Ensure Node Exporter service is started and enabled to run on boot using Ansible systemd module, which takes into consideration the presence or absence of required dependencies like 'systemd' itself as well as any related libraries needed by node_exporter. The task should also be idempotent in nature ensuring that no changes occur if Node Exporter service is already set up and running (e.g., include this after successful package installation).
+      ansible.builtin.systemd:  # This plays a critical role of maintaining system integrity by avoiding reboots or unnecessary operations when services are not required to be restarted, thus preserving the stability of target instances within orchestrated environments in line with enterprise standards and expectations for observability setup tasks (e.g., vars['node_exporter']).
+        name: node_exporter  # Name as specified against service unit file created prior or directly if already existing without needing template module usage here due to idempotence assured by the preceding task definitions within playbook executions flow, typically this would be followed up with a handler that specifically relates back to Node Exporter services.
+        enabled: yes  # Ensures service starts on boot as standard behavior for enterprise-grade systemd managed services (e.g., vars['node_exporter']).
+      
+    - name: Notify the start of installing/starting node_exporter using a callback plugin or other means to keep track and log progress if necessary based on your infrastructure requirements, typically this would be integrated within Ansible's playbook execution environment (e.g., vars['callback']). It ensures that any required logging is handled by the Playbooks with standardized outputs in line of enterprise protocol standards which should include:
+      callback_events: json  # Specifying JSON format for structured and parseable logs output, facilitating automated processing/monitoring via CI tools if necessary (e.g., vars['callback']). This allows maintainers or infrastructure teams to track the progress of playbook executions regarding specific tasks such as service installations and starts in an ordered manner aligning with enterprise standards on observability platform monitoring efforts, including but not limited to:
+      extra_vars:  # Defining any additional variables required for executing callback events beyond standard Ansible module arguments (e.g., vars['callback']). It ensures that playbook execution environments are prepared in advance with the necessary contextual information available directly from orchestration tools, enhancing visibility and tracking capabilities of automated tasks within a unified observability platform setup pipeline flow for role specific operations such as Node Exporter service installations/starts.
+        node_exporter: "{{ ansible_failed_tasks|length == 0 | ternary(ansible_failed_plugins_loaded, 'Ansible callback plugins are not loaded correctly or the playbook execution environment does not support Ansible notifications yet') }}" # This variable can be used to customize and conditionally display messages related to Node Exporter service installation/starting events within a unified logging system based on enterprise protocol standards (e.g., vars['callback']). It ensures that administrators or orchestration team members are promptly informed about the progress of specific playbook executions, especially relating back to automated task notifications and reporting efforts required for comprehensive observability platform monitoring initiatives within infrastructure environments managed by Ansible (e.g., vars['callback']).
+```
+----------------------------------------

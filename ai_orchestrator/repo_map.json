@@ -1,10 +1,69 @@
 {
   "project_name": "ai-pr-orchestrator",
-  "structure_hash": "f291be40d33449eb155d38949b7a47e1",
+  "structure_hash": "2367cfc5716bb2ba0fb5fd0c7d70a2a0",
   "map": {
     "__files__": [
       ".gitignore"
     ],
+    "ai_orchestrator": {
+      "__files__": [
+        "__init__.py",
+        "language_profiles.json",
+        "main.py",
+        "orchestrator_core.py",
+        "repo_config.json",
+        "requirements.txt",
+        "scrub_policy.json",
+        "test_redaction.py",
+        "test_trigger.py",
+        "test_trigger2.py"
+      ],
+      "config": {
+        "__files__": [
+          "mapping.yaml"
+        ]
+      },
+      "logs": {
+        "__files__": [
+          "KAN-10_audit.log",
+          "KAN-11_audit.log",
+          "KAN-12_audit.log",
+          "KAN-13_audit.log",
+          "KAN-14_audit.log",
+          "KAN-15_audit.log",
+          "KAN-16_audit.log",
+          "KAN-17_audit.log",
+          "KAN-7_audit.log",
+          "KAN-9_audit.log"
+        ]
+      },
+      "prompts": {
+        "__files__": [
+          "ansible.md",
+          "common.md",
+          "standards.md",
+          "system.md",
+          "terraform.md"
+        ]
+      },
+      "services": {
+        "__files__": [
+          "__init__.py",
+          "github_svc.py",
+          "jira_svc.py",
+          "logger_svc.py",
+          "prompt_svc.py"
+        ]
+      },
+      "tools": {
+        "__files__": [
+          "__init__.py",
+          "generate_map.py",
+          "secure_read_file.py",
+          "validate_output.py"
+        ]
+      }
+    },
     "git-driven-observability": {
       "ansible": {
         "__files__": [
